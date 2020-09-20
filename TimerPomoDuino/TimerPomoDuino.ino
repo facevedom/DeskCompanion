@@ -1,42 +1,38 @@
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include "config.h"
+#include <HTTPClient.h>
+#include <OneButton.h>
+#include <SH1106Wire.h>
 #include <WiFi.h>
 #include <Wire.h>
-#include <HTTPClient.h>
-#include "SH1106Wire.h"
-#include "ArduinoJson.h"
-#include "config.h"
-#include <Arduino.h>
-#include <OneButton.h>
 
-TaskHandle_t httpLoopTask;
+// hardware constants
+const char DISPLAY_ADDRESS = 0x3C;
+const int SPOTIFY_BUTTON_PIN = 12;
 
-const char* ssid = WIFI_SSID;
-const char* password = WIFI_PASSWD;
-const String serverName = SERVER_NAME;
+// WiFi and server configuration is read from "config.h"
+const char* WIFI_SSID = CONF_WIFI_SSID;
+const char* WIFI_PASSWORD = CONF_WIFI_PASSWORD;
+const String SPOTIFY_REMOTE_SERVER = CONF_SPOTIFY_REMOTE_SERVER_NAME;
 
-SH1106Wire display(0x3C, SDA, SCL, GEOMETRY_128_64);  // ADDRESS, SDA, SCL
+// display initialization
+SH1106Wire display(DISPLAY_ADDRESS, SDA, SCL, GEOMETRY_128_64);
 
-StaticJsonDocument<300> doc;
-
+// HTTP clients initialization
 HTTPClient songRefresherHttpClient;
 HTTPClient toggleButtonHttpClient;
 HTTPClient nextButtonHttpClient;
 HTTPClient previousButtonHttpClient;
 
+// Spotify control button declaration
 OneButton btn = OneButton(
-  12,  // Input pin for the button
-  true,        // Button is active LOW
-  true         // Enable internal pull-up resistor
+  SPOTIFY_BUTTON_PIN,  // input pin for the button
+  true,                // button is active LOW
+  true                 // enable internal pull-up resistor
 );
 
-String queuedSpotifyEvent = "none";
-
-// will die
-struct Button {
-  const uint8_t PIN;
-  bool pressed;
-  unsigned long lastPressed;
-};
-
+// song struct
 struct Song {
   String name;
   String artist;
@@ -45,31 +41,34 @@ struct Song {
   double progress;
 };
 
-//Button pauseButton = {12, false, 0};
-Song nowPlaying;
-
-//void IRAM_ATTR pauseSong() {
-//  pauseButton.pressed = true;
-//}
+// state holders
+StaticJsonDocument<300> doc; // JSON doc to hold the Spotify song data
+String queuedSpotifyEvent; // will hold the requested state from Spotify button action
+Song nowPlaying; // will hold the current playing song data already parsed
+TaskHandle_t httpLoopTask; // secondary loop (for http tasks) task handler
 
 void setup() {
-  //pinMode(pauseButton.PIN, INPUT_PULLUP);
-  //attachInterrupt(pauseButton.PIN, pauseSong, FALLING);
   Serial.begin(115200);
-  WiFi.begin(ssid, password);
+  queuedSpotifyEvent = "none";
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   display.init();
   display.flipScreenVertically();
   display.clear();
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.drawString(0, 0, "Connecting to WiFi: \n" + String(ssid));
+  display.drawString(0, 0, "Connecting to WiFi: \n" + String(WIFI_SSID));
   display.display();
 
-  int iteration = 0;
+  int iteration = 1;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    display.drawString(0 + iteration, 30, ".");
+    display.drawString(iteration*16 - 1, 30, ".");
     display.display();
+
+    if (iteration == 7) {
+      ESP.restart();
+    }
+
     iteration += 1;
   }
 
@@ -134,10 +133,10 @@ void runSpotifyEvent() {
 
 void httpLoop(void * pvParameters) {
   unsigned long lastRefreshed;
-  songRefresherHttpClient.begin(serverName + "playing");
-  toggleButtonHttpClient.begin(serverName + "toggle");
-  nextButtonHttpClient.begin(serverName + "next");
-  previousButtonHttpClient.begin(serverName + "previous");
+  songRefresherHttpClient.begin(SPOTIFY_REMOTE_SERVER + "playing");
+  toggleButtonHttpClient.begin(SPOTIFY_REMOTE_SERVER + "toggle");
+  nextButtonHttpClient.begin(SPOTIFY_REMOTE_SERVER + "next");
+  previousButtonHttpClient.begin(SPOTIFY_REMOTE_SERVER + "previous");
 
   while (true) {
     if (WiFi.status() == WL_CONNECTED) {
