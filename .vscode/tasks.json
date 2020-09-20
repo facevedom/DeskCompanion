@@ -6,7 +6,7 @@
         {
             "label": "Build TimerPomoDuino",
             "type": "shell",
-            "command": "cd TimerPomoDuino && arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328old TimerPomoDuino.ino",
+            "command": "cd TimerPomoDuino && arduino-cli compile --fqbn esp32:esp32:esp32 TimerPomoDuino.ino",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -16,7 +16,10 @@
         {
             "label": "Upload TimerPomoDuino",
             "type": "shell",
-            "command": "arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:nano:cpu=atmega328old TimerPomoDuino"
+            "dependsOn": [
+                "Build TimerPomoDuino"
+            ],
+            "command": "arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 TimerPomoDuino"
         }
     ]
 }
