@@ -26,7 +26,7 @@ HTTPClient nextButtonHttpClient;
 HTTPClient previousButtonHttpClient;
 
 // Spotify control button declaration
-OneButton btn = OneButton(
+OneButton spotifyButton = OneButton(
   SPOTIFY_BUTTON_PIN,  // input pin for the button
   true,                // button is active LOW
   true                 // enable internal pull-up resistor
@@ -47,56 +47,79 @@ String queuedSpotifyEvent; // will hold the requested state from Spotify button 
 Song nowPlaying; // will hold the current playing song data already parsed
 TaskHandle_t httpLoopTask; // secondary loop (for http tasks) task handler
 
-void setup() {
-  Serial.begin(115200);
-  queuedSpotifyEvent = "none";
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+void initializeDisplay() {
   display.init();
   display.flipScreenVertically();
   display.clear();
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_LEFT);
+}
+
+void setupWifiConnection() {
   display.drawString(0, 0, "Connecting to WiFi: \n" + String(WIFI_SSID));
   display.display();
 
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   int iteration = 1;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    display.drawString(iteration*16 - 1, 30, ".");
+
+    display.drawString(iteration*16 - 1, 30, "."); // draw a pseudo progress bar
     display.display();
 
+    /* 
+      if 3.5 seconds have passed without being able to connect to wifi, reboot the board.
+      every other reboot, the WiFi will get stuck establishing a connection, this is a workaround
+      TODO: what about offline mode?
+    */ 
     if (iteration == 7) {
       ESP.restart();
     }
-
     iteration += 1;
   }
 
   display.clear();
-  display.display();
+  display.display();  
+}
 
+void startHTTPLoopTask() {
   xTaskCreatePinnedToCore(
-    httpLoop,      /* Task function. */
-    "httpLoop",    /* name of task. */
-    10000,                  /* Stack size of task */
+    httpLoop,      // task function. */
+    "httpLoop",    // name of task. */
+    10000,         // stack size of task */
     NULL,                   /* parameter of the task */
     0,                      /* priority of the task */
     &httpLoopTask, /* Task handle to keep track of created task */
-    0);                     /* pin task to core 0 */
+    0               /* pin task to core 0 */
+  );
+}
 
-    // Single Click event attachment
-    btn.attachClick([]() {
-      queuedSpotifyEvent = "toggle";
-    });
+void attachSpotifyEventsButtonEvents() {
+  queuedSpotifyEvent = "none";
 
-    // Double Click event attachment with lambda
-    btn.attachDoubleClick([]() {
-      queuedSpotifyEvent = "next";
-    });
+  // single click to play/pause
+  spotifyButton.attachClick([]() {
+    queuedSpotifyEvent = "toggle";
+  });
 
-    btn.attachLongPressStart([]() {
-      queuedSpotifyEvent = "previous";
-    });
+  // double click to skip song
+  spotifyButton.attachDoubleClick([]() {
+    queuedSpotifyEvent = "next";
+  });
+
+  // long press to play previous song
+  spotifyButton.attachLongPressStart([]() {
+    queuedSpotifyEvent = "previous";
+  });
+}
+
+void setup() {
+  Serial.begin(115200);
+  
+  initializeDisplay();
+  setupWifiConnection();
+  startHTTPLoopTask();
+  attachSpotifyEventsButtonEvents();
 }
 
 bool refreshSongState() {
@@ -164,7 +187,7 @@ void httpLoop(void * pvParameters) {
 
 void loop() {  
   if ((WiFi.status() == WL_CONNECTED)) { //Check the current connection status
-    btn.tick();
+    spotifyButton.tick();
 
     display.clear();
     if (!nowPlaying.isPlaying) {
