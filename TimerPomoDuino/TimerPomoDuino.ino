@@ -47,6 +47,8 @@ String queuedSpotifyEvent; // will hold the requested state from Spotify button 
 Song nowPlaying; // will hold the current playing song data already parsed
 TaskHandle_t httpLoopTask; // secondary loop (for http tasks) task handler
 
+int SPOTIFY_SONG_REFRESH_FRECUENCY = 750; // how often will the Spotify song metadata be refreshed
+
 void initializeDisplay() {
   display.init();
   display.flipScreenVertically();
@@ -64,7 +66,7 @@ void setupWifiConnection() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
 
-    display.drawString(iteration*16 - 1, 30, "."); // draw a pseudo progress bar
+    display.drawString(iteration*16 - 1, 40, "."); // draw a pseudo progress bar
     display.display();
 
     /* 
@@ -94,102 +96,43 @@ void startHTTPLoopTask() {
   );
 }
 
-void attachSpotifyEventsButtonEvents() {
-  queuedSpotifyEvent = "none";
-
-  // single click to play/pause
-  spotifyButton.attachClick([]() {
-    queuedSpotifyEvent = "toggle";
-  });
-
-  // double click to skip song
-  spotifyButton.attachDoubleClick([]() {
-    queuedSpotifyEvent = "next";
-  });
-
-  // long press to play previous song
-  spotifyButton.attachLongPressStart([]() {
-    queuedSpotifyEvent = "previous";
-  });
-}
-
 void setup() {
   Serial.begin(115200);
   
   initializeDisplay();
   setupWifiConnection();
   startHTTPLoopTask();
-  attachSpotifyEventsButtonEvents();
-}
+  attachSpotifyEventsButton();
 
-bool refreshSongState() {
-  //Serial.println("Refreshing state");
-  int httpCode = songRefresherHttpClient.GET();    //Make the request
-  if (httpCode > 0) { //Check for the returning code
-    DeserializationError error = deserializeJson(doc, songRefresherHttpClient.getString());
-    nowPlaying.name = doc["name"].as<String>();
-    nowPlaying.artist = doc["artist"].as<String>();
-    nowPlaying.isPlaying = doc["is_playing"].as<bool>();
-    nowPlaying.duration = doc["duration"].as<double>();
-    nowPlaying.progress = doc["progress"].as<double>();
-  } else {
-      Serial.println("error getting to Spotify");
-  }
-}
-
-void runSpotifyEvent() {
-  if (queuedSpotifyEvent == "toggle") {
-    toggleButtonHttpClient.GET();
-    String payload = toggleButtonHttpClient.getString();
-    Serial.println(payload);
-  } else if (queuedSpotifyEvent == "next") {
-    nextButtonHttpClient.GET();
-    String payload = nextButtonHttpClient.getString();
-    Serial.println(payload);
-  } else if(queuedSpotifyEvent == "previous") {
-    previousButtonHttpClient.GET();
-    String payload = previousButtonHttpClient.getString();
-    Serial.println(payload);          
-  }
-  queuedSpotifyEvent = "none";
+  Serial.println("Setup complete");
 }
 
 void httpLoop(void * pvParameters) {
-  unsigned long lastRefreshed;
-  songRefresherHttpClient.begin(SPOTIFY_REMOTE_SERVER + "playing");
-  toggleButtonHttpClient.begin(SPOTIFY_REMOTE_SERVER + "toggle");
-  nextButtonHttpClient.begin(SPOTIFY_REMOTE_SERVER + "next");
-  previousButtonHttpClient.begin(SPOTIFY_REMOTE_SERVER + "previous");
+  initializeSpotifyHTTPClients();
 
+  unsigned long lastSongRefresh;
+  // HTTP loop
   while (true) {
     if (WiFi.status() == WL_CONNECTED) {
+      // check for queued events from the Spotify button
       if (queuedSpotifyEvent != "none") {
-        Serial.println("Event detected");
         runSpotifyEvent();
       }
 
-      if ((millis() - lastRefreshed) > 750) {
-        refreshSongState();
-        lastRefreshed = millis();
+      // periodically refresh the Spotify song status
+      if ((millis() - lastSongRefresh) > SPOTIFY_SONG_REFRESH_FRECUENCY) {
+        refreshSpotifySongState();
+        lastSongRefresh = millis();
       }
     } else {
-      // handle no WiFi connection
+      Serial.println("WiFi connection lost!");
     }
   }
 
-  songRefresherHttpClient.end(); //Free the resources
-  toggleButtonHttpClient.end();
-  nextButtonHttpClient.end();
-  previousButtonHttpClient.end();
+  tearDownSpotifyHTTPClients();
 }
 
-
-
-void loop() {  
-  if ((WiFi.status() == WL_CONNECTED)) { //Check the current connection status
-    spotifyButton.tick();
-
-    display.clear();
+void displayCurrentPlayingSong() {
     if (!nowPlaying.isPlaying) {
       display.fillRect(60, 13, 3, 8);
       display.fillRect(65, 13, 3, 8);
@@ -202,6 +145,13 @@ void loop() {
     display.setTextAlignment(TEXT_ALIGN_RIGHT);
     display.drawString(127, 20, nowPlaying.artist);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
+}
+
+void loop() {  
+  if ((WiFi.status() == WL_CONNECTED)) { //Check the current connection status
+    spotifyButton.tick();
+    display.clear();
+    displayCurrentPlayingSong();
     display.display();
   }
 }
