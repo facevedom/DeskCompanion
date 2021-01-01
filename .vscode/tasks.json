@@ -11,14 +11,11 @@
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
+            }
         },
         {
             "label": "Upload DeskCompanion",
             "type": "shell",
-            "dependsOn": [
-                "Build DeskCompanion"
-            ],
             "command": "arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 DeskCompanion"
         }
     ]
