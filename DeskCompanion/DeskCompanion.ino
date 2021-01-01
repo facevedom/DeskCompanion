@@ -3,8 +3,14 @@
 #include <SH1106Wire.h>
 #include <Wire.h>
 
+#include "debug.h"
+
 void setup() {
-  Serial.begin(115200);
+  #ifdef DEBUG
+    Serial.begin(115200);
+  #endif
+  
+  DEBUG_PRINT("Debugging is enabled");
 }
 
 void loop() {
