@@ -10,20 +10,24 @@
 #define SWITCH_RIGHT_PIN 19
 
 struct sharedState {
-  bool offlineMode;
+  bool offline_mode;
 } state;
 
-LeverSwitch leverSwitch(SWITCH_LEFT_PIN, SWITCH_RIGHT_PIN);
+LeverSwitch lever_switch(SWITCH_LEFT_PIN, SWITCH_RIGHT_PIN);
 
-bool offlineModeCheck() {
-  if (leverSwitch.position == LeverSwitch::ON_CENTER) {
-    state.offlineMode = true;
+Runnable *runnables[] = {
+  &lever_switch
+};
+
+bool offline_modeCheck() {
+  if (lever_switch.position == LeverSwitch::ON_CENTER) {
+    state.offline_mode = true;
   } else {
-    state.offlineMode = false;
+    state.offline_mode = false;
   }
 
   DEBUG_PRINT("Offline mode: ");
-  DEBUG_PRINTLN(state.offlineMode);
+  DEBUG_PRINTLN(state.offline_mode);
 }
 
 void setup() {
@@ -32,11 +36,13 @@ void setup() {
   #endif
   DEBUG_PRINTLN("Debugging is enabled");
 
-  leverSwitch.setup();
+  for (int i = 0; i < sizeof(runnables) / sizeof(*runnables); i++)
+    runnables[i]->setup();
 
-  offlineModeCheck();
+  offline_modeCheck();
 }
 
 void loop() {
-  leverSwitch.loop();
+  for (int i = 0; i < sizeof(runnables) / sizeof(*runnables); i++)
+    runnables[i]->loop();
 }

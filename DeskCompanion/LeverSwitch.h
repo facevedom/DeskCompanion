@@ -2,8 +2,9 @@
 #define SWITCH_H
 
 #include <Arduino.h>
+#include "Runnable.h"
 
-class LeverSwitch {
+class LeverSwitch: public Runnable {
     private:
         byte leftPin;
         byte rightPin;
@@ -13,7 +14,6 @@ class LeverSwitch {
         LeverSwitch(byte leftPin, byte rightPin);
         void setup();
         void loop();
-        int getPosition();
         enum Position{
             ON_LEFT,
             ON_CENTER,
