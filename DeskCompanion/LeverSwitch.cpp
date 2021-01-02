@@ -22,4 +22,3 @@ void LeverSwitch::readPosition() {
         position = ON_RIGHT;
     }
 }
-
