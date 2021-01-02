@@ -4,9 +4,11 @@
 #include <Wire.h>
 
 #include "debug.h"
+#include "display.h"
 #include "hardwareConstants.h"
 #include "src/LeverSwitch.h"
 #include "src/Stopwatch.h"
+using namespace Display;
 
 struct sharedState {
   bool offline_mode;
@@ -34,30 +36,20 @@ void loopAllRunnables() {
 
 bool offlineModeCheck() {
   state.offline_mode = (lever_switch.position == LeverSwitch::ON_CENTER);
-  DEBUG_PRINT("Offline mode: ");
-  DEBUG_PRINTLN(state.offline_mode);
-}
-
-void initializeDisplay() {
-  display.init();
-  display.flipScreenVertically();
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  DEBUG_PRINT("Display initialized");
+  DEBUG_PRINTLN("Offline mode: " + String(state.offline_mode));
 }
 
 void setup() {
   #ifdef DEBUG
     Serial.begin(115200);
+    DEBUG_PRINTLN("\nDesk companion debug:\n");
   #endif
-  DEBUG_PRINTLN("Debugging is enabled");
   
-  initializeDisplay();
-  offlineModeCheck();
+  Display::initialize();
   setupAllRunnables();
+  offlineModeCheck();
 
-  display.drawString(0, 0, "Desk companion started!");
-  display.display();
+  Display::welcome();
 }
 
 void loop() {
