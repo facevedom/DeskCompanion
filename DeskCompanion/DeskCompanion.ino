@@ -4,7 +4,7 @@
 #include <Wire.h>
 
 #include "debug.h"
-#include "LeverSwitch.h"
+#include "src/LeverSwitch.h"
 
 #define SWITCH_LEFT_PIN 18
 #define SWITCH_RIGHT_PIN 19
@@ -19,13 +19,18 @@ Runnable *runnables[] = {
   &lever_switch
 };
 
-bool offline_modeCheck() {
-  if (lever_switch.position == LeverSwitch::ON_CENTER) {
-    state.offline_mode = true;
-  } else {
-    state.offline_mode = false;
-  }
+void setupAllRunnables() {
+  for (int i = 0; i < sizeof(runnables) / sizeof(*runnables); i++)
+    runnables[i]->setup();
+}
 
+void loopAllRunnables() {
+  for (int i = 0; i < sizeof(runnables) / sizeof(*runnables); i++)
+    runnables[i]->loop();
+}
+
+bool offlineModeCheck() {
+  state.offline_mode = (lever_switch.position == LeverSwitch::ON_CENTER);
   DEBUG_PRINT("Offline mode: ");
   DEBUG_PRINTLN(state.offline_mode);
 }
@@ -36,13 +41,10 @@ void setup() {
   #endif
   DEBUG_PRINTLN("Debugging is enabled");
 
-  for (int i = 0; i < sizeof(runnables) / sizeof(*runnables); i++)
-    runnables[i]->setup();
-
-  offline_modeCheck();
+  setupAllRunnables();
+  offlineModeCheck();
 }
 
 void loop() {
-  for (int i = 0; i < sizeof(runnables) / sizeof(*runnables); i++)
-    runnables[i]->loop();
+  loopAllRunnables();
 }
