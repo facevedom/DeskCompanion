@@ -9,9 +9,22 @@
 #define SWITCH_LEFT_PIN 18
 #define SWITCH_RIGHT_PIN 19
 
+struct sharedState {
+  bool offlineMode;
+} state;
+
 LeverSwitch leverSwitch(SWITCH_LEFT_PIN, SWITCH_RIGHT_PIN);
 
-void checkFor
+bool offlineModeCheck() {
+  if (leverSwitch.position == LeverSwitch::ON_CENTER) {
+    state.offlineMode = true;
+  } else {
+    state.offlineMode = false;
+  }
+
+  DEBUG_PRINT("Offline mode: ");
+  DEBUG_PRINTLN(state.offlineMode);
+}
 
 void setup() {
   #ifdef DEBUG
@@ -20,24 +33,10 @@ void setup() {
   DEBUG_PRINTLN("Debugging is enabled");
 
   leverSwitch.setup();
+
+  offlineModeCheck();
 }
 
 void loop() {
   leverSwitch.loop();
-  delay(500);
-
-  switch (leverSwitch.position) {
-    case LeverSwitch::ON_LEFT:
-    DEBUG_PRINTLN("at left");
-    break;
-
-    case LeverSwitch::ON_CENTER:
-    DEBUG_PRINTLN("at center");
-    break;
-
-    case LeverSwitch::ON_RIGHT:
-    DEBUG_PRINTLN("at right");
-    break;
-  }
-
 }
